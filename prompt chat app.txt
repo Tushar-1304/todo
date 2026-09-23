@@ -1,0 +1,1435 @@
+You are a senior full-stack JavaScript engineer, PostgreSQL database architect, application security engineer, UI/UX designer, and deployment specialist.
+
+I want you to create a complete, working, production-structured private real-time chat web application based on the requirements below.
+
+Do not provide only an overview, pseudocode, partial examples, placeholders, or disconnected snippets. Create a functional project with complete code for every required file.
+
+If the complete project cannot fit safely into one response, divide the work into clearly numbered stages. Maintain the same architecture, names, database schema, routes, environment variables, and design decisions across every stage.
+
+Do not silently change requirements between stages.
+
+==================================================
+1. PROJECT PURPOSE
+==================================================
+
+Build a private, real-time, text-only chat web application that will be used by exactly two predefined people:
+
+1. Tushar
+2. Tushar's friend
+
+This is not a public or multi-user chat platform.
+
+There must be:
+
+- No public signup
+- No email registration
+- No username and password registration
+- No email OTP
+- No Nodemailer
+- No forgot-password process
+- No user search
+- No contact requests
+- No contact list
+- No groups
+- No public profiles
+- No social login
+
+There is only one permanent private conversation between the two predefined participants.
+
+The application should look and behave like a simple, polished, private WhatsApp-style text conversation.
+
+==================================================
+2. CORE USER EXPERIENCE
+==================================================
+
+When a person visits the application for the first time, show an identity verification screen.
+
+The screen should ask:
+
+"Who are you?"
+
+It should provide two identity choices:
+
+- Tushar
+- Friend
+
+After selecting an identity, the person must enter that identity's private access code.
+
+Each participant must have a separate private access code.
+
+Never hardcode the readable access codes in:
+
+- Frontend JavaScript
+- HTML
+- CSS
+- Git repository
+- Database migrations
+- Server source code
+- Browser localStorage
+- Browser sessionStorage
+
+The readable access codes must be provided through server environment variables.
+
+The server must compare the submitted access code against a securely generated hash stored in an environment variable.
+
+Suggested environment variable names:
+
+TUSHAR_ACCESS_CODE_HASH
+FRIEND_ACCESS_CODE_HASH
+
+Use Argon2id for hashing and verifying access codes.
+
+After successful verification, create a secure, random, server-managed session.
+
+Store only a hash of the session token in PostgreSQL.
+
+Send the raw session token to the browser as an HTTP-only cookie with appropriate security options.
+
+The cookie must use:
+
+- httpOnly: true
+- secure: true in production
+- sameSite: "lax" or stricter when appropriate
+- An explicit expiration
+- An appropriate cookie path
+- A non-generic cookie name
+
+The browser must not be able to read the authentication cookie through JavaScript.
+
+On future visits from the same authenticated browser:
+
+1. Validate the session cookie on the server.
+2. Identify the participant.
+3. Open the chat automatically.
+4. Do not ask for the access code again unless the session has expired, been revoked, or the browser cookies were cleared.
+
+Provide a logout option.
+
+After logout:
+
+- Revoke the current session in PostgreSQL.
+- Clear the authentication cookie.
+- Redirect to the identity verification page.
+
+Support multiple authenticated devices for each participant. For example, Tushar may be logged in on both a phone and a laptop.
+
+==================================================
+3. APPLICATION URL AND DEPLOYMENT SHAPE
+==================================================
+
+The entire application must run as one Node.js web service under one public URL.
+
+Example:
+
+https://private-chat.example.com
+
+The frontend and backend must not require separate public deployments.
+
+Use one Express application to serve:
+
+- Static frontend files
+- HTML pages
+- REST API routes
+- Socket.IO connections
+
+Use relative frontend URLs such as:
+
+/api/session
+/api/messages
+/socket.io/
+
+Do not hardcode a Render, Northflank, Koyeb, Oracle Cloud, localhost, or other deployment URL in frontend code.
+
+The same codebase must be portable between:
+
+- Render
+- Northflank
+- Koyeb
+- Oracle Cloud VM
+- A local development machine
+- Any normal Node.js host that supports persistent WebSocket connections
+
+The deployment provider will be selected later.
+
+The application must listen on:
+
+process.env.PORT || 3000
+
+Bind the server correctly so it works in a hosted Linux environment.
+
+Express and Socket.IO must use the same HTTP server.
+
+Do not call app.listen separately if Socket.IO is attached to a different server.
+
+==================================================
+4. REQUIRED TECHNOLOGY STACK
+==================================================
+
+Frontend:
+
+- HTML5
+- CSS3
+- Vanilla JavaScript
+- Socket.IO client
+- No React
+- No Vue
+- No Angular
+- No frontend build system unless absolutely required
+- No Bootstrap unless specifically justified
+- No external UI framework required
+
+Backend:
+
+- Node.js using a current supported LTS-compatible approach
+- Express.js
+- Socket.IO
+- PostgreSQL
+- node-postgres using pg.Pool
+- Argon2id for access-code hashing
+- Secure random session tokens
+- Cookie-based server-managed sessions
+- Helmet
+- Cookie parser
+- Request validation using Zod
+- Route-specific rate limiting
+- Structured error handling
+- Environment variables through dotenv for local development
+
+Database:
+
+- PostgreSQL
+- Supabase PostgreSQL is the initial recommended hosted database
+- The code must remain compatible with standard PostgreSQL
+- Do not depend on Supabase Auth
+- Do not depend on Supabase Realtime
+- Do not expose Supabase credentials to the browser
+- Only the Node.js server may communicate with PostgreSQL
+
+Real-time communication:
+
+- Socket.IO
+- Authenticated socket connections
+- Automatic reconnection
+- Server acknowledgements
+- Duplicate-message prevention
+- Missed-message synchronization
+
+==================================================
+5. REQUIRED FRONTEND PAGES
+==================================================
+
+Use two main pages.
+
+A. Identity verification page
+
+Route:
+
+GET /
+
+The page should contain:
+
+- Application name
+- A short privacy message
+- Identity selection for Tushar or Friend
+- Private access-code field
+- Show or hide access-code option
+- Continue button
+- Loading state
+- Clear validation messages
+- Incorrect-code message that does not expose server details
+- Responsive design
+- Accessible labels
+- Keyboard support
+- A polished private-chat visual style
+
+If a valid session already exists, redirect to /chat.
+
+B. Chat page
+
+Route:
+
+GET /chat
+
+The page should contain:
+
+- The other participant's display name
+- Online or offline status
+- Connection status
+- Scrollable message history
+- Date separators
+- Sent and received message bubbles
+- Message timestamps
+- Sent, delivered, and read indicators
+- Reply-to-message support
+- Reply preview above the composer
+- Cancel-reply control
+- Multiline text composer
+- Send button
+- Logout option
+- Loading state for older messages
+- Reconnecting state
+- Waking-server or connecting state
+- Empty conversation state
+- Unread handling
+- Mobile responsive layout
+- Desktop responsive layout
+- Safe-area support where practical on mobile devices
+
+If no valid session exists, redirect to /.
+
+The chat should occupy the whole application area because there is only one conversation.
+
+Do not create a contact sidebar.
+
+==================================================
+6. CHAT FEATURES
+==================================================
+
+The first version must support:
+
+- One-to-one text messages
+- Real-time delivery through Socket.IO
+- Persistent database storage
+- Server-generated timestamps
+- Previous message history
+- Cursor-based message pagination
+- Replying to a specific message
+- Sent status
+- Delivered status
+- Read status
+- Online and offline presence
+- Automatic reconnection
+- Synchronization after reconnecting
+- Multiple browser tabs
+- Multiple devices per participant
+- Unread-message calculation
+- Duplicate-message prevention
+- Failed-message feedback
+- Message retry where safe
+- Optimistic UI only if implemented correctly
+- Safe display of untrusted message text
+
+The first version must not support:
+
+- Images
+- Videos
+- Audio
+- Files
+- Voice notes
+- Stickers
+- GIFs
+- Voice calls
+- Video calls
+- Group conversations
+- Message editing
+- Message deletion
+- Reactions
+- Emoji picker
+- Push notifications
+- Exact last-seen history
+- End-to-end encryption
+- Public registration
+
+Maximum message length:
+
+2,000 characters
+
+Reject:
+
+- Empty messages
+- Whitespace-only messages
+- Messages exceeding the maximum length
+- Messages from unauthenticated sockets
+- Messages with mismatched sender identities
+- Replies to nonexistent messages
+- Replies to messages outside this private chat
+
+Treat all message content as plain text.
+
+Do not render message content through unsafe innerHTML.
+
+Use textContent or another safe text-rendering technique to prevent stored cross-site scripting.
+
+==================================================
+7. MESSAGE DELIVERY RULES
+==================================================
+
+Use these status meanings:
+
+Sending:
+The message currently exists only in the sender's browser and is waiting for a server acknowledgement.
+
+Sent:
+The server validated and stored the message successfully in PostgreSQL.
+
+Delivered:
+At least one active socket belonging to the other participant received and acknowledged the message.
+
+Read:
+The other participant opened the chat and advanced their read marker beyond or to that message.
+
+Failed:
+The server rejected the message or did not acknowledge it within a reasonable timeout.
+
+The database is the source of truth.
+
+Always save a message in PostgreSQL before broadcasting it to the recipient.
+
+Every outgoing message must include a client-generated UUID called clientMessageId.
+
+Create a database uniqueness constraint using:
+
+sender_id + client_message_id
+
+If a message is retried after a connection interruption, the server must not create a duplicate record.
+
+If the same clientMessageId is received again from the same sender, return the previously created message.
+
+Do not trust a sender ID provided by the browser.
+
+Derive the sender identity from the verified server session.
+
+==================================================
+8. REPLY FEATURE
+==================================================
+
+A participant must be able to select a previous message and reply to it.
+
+The outgoing message may contain:
+
+replyToMessageId
+
+The server must verify that:
+
+- The referenced message exists.
+- It belongs to the same single private chat.
+- The requesting participant is authorized to view it.
+
+The UI should show a compact preview of the replied-to message above or inside the new message bubble.
+
+If the original message is long, display a safely truncated preview.
+
+==================================================
+9. MESSAGE HISTORY AND PAGINATION
+==================================================
+
+Do not load every message at once.
+
+Load the newest 30 messages initially.
+
+When the user scrolls toward the top, fetch older messages.
+
+Use cursor-based pagination, not page-number pagination.
+
+An example REST pattern may be:
+
+GET /api/messages?before=<messageId>&limit=30
+
+The server must enforce a maximum limit of 50 messages even if the browser requests a larger number.
+
+Return a stable ordering and enough pagination information for the frontend.
+
+After a Socket.IO reconnection, request messages newer than the newest locally known message or use a sync endpoint.
+
+The application must retrieve any messages missed while disconnected.
+
+==================================================
+10. ONLINE AND OFFLINE PRESENCE
+==================================================
+
+Presence is temporary and may be managed in server memory because only one application instance is expected initially.
+
+Track how many authenticated sockets each participant currently has.
+
+A participant is online when one or more authenticated sockets are connected.
+
+A participant is offline only after all their authenticated sockets disconnect.
+
+Do not mark a participant offline merely because one browser tab closed while another device or tab remains connected.
+
+Broadcast presence changes only to the other authenticated participant.
+
+Do not expose presence publicly.
+
+Design the code so Redis could be added later if the application ever runs on multiple server instances, but do not require Redis in version 1.
+
+==================================================
+11. READ STATE
+==================================================
+
+Do not update every individual message row merely to mark messages as read.
+
+Use a participant state or read-marker table containing fields similar to:
+
+participant_id
+last_read_message_id
+last_read_at
+
+When a participant opens the chat or reads newer messages, advance the read marker.
+
+Do not allow the read marker to move backward.
+
+Use the other participant's read marker to determine which outgoing messages are read.
+
+Emit real-time read updates through Socket.IO.
+
+==================================================
+12. DATABASE DESIGN
+==================================================
+
+Provide a complete PostgreSQL schema and migration files.
+
+Use PostgreSQL UUID primary keys.
+
+Use pgcrypto and gen_random_uuid() if appropriate, or generate UUIDs reliably in the application.
+
+At minimum, include the following tables.
+
+A. participants
+
+Suggested fields:
+
+- id UUID primary key
+- identity_key unique and immutable
+- display_name
+- created_at
+- updated_at
+
+Seed exactly two participant identities:
+
+- tushar
+- friend
+
+Do not store readable private access codes in this table.
+
+B. sessions
+
+Suggested fields:
+
+- id UUID primary key
+- participant_id foreign key
+- token_hash unique
+- created_at
+- last_used_at
+- expires_at
+- revoked_at
+- user_agent where appropriate
+- optional non-sensitive device label or IP metadata only if justified
+
+Store only a hash of the session token.
+
+C. messages
+
+Suggested fields:
+
+- id UUID primary key
+- client_message_id UUID not null
+- sender_id foreign key
+- message_text text not null
+- reply_to_message_id nullable self-reference
+- created_at timestamptz generated by the server or database
+- delivered_at nullable if needed by the selected design
+
+Create an appropriate unique constraint for:
+
+sender_id + client_message_id
+
+Create indexes needed for:
+
+- Newest-message retrieval
+- Older-message pagination
+- Sender and client-message idempotency
+- Reply lookup
+
+D. participant_state
+
+Suggested fields:
+
+- participant_id primary key and foreign key
+- last_read_message_id nullable
+- last_read_at nullable
+- updated_at
+
+If additional tables are needed, explain why and include them consistently.
+
+Add appropriate:
+
+- Foreign keys
+- Check constraints
+- Unique constraints
+- Indexes
+- Cascading or restrictive delete behavior
+- Timestamp defaults
+
+The database schema must prevent invalid data where practical.
+
+Provide:
+
+- Initial migration
+- Participant seed migration or seed script
+- A safe reset script for local development only
+- Clear migration instructions
+
+==================================================
+13. SESSION AUTHENTICATION
+==================================================
+
+Do not use a public username/password system.
+
+Do not use JWT unless there is a strong technical reason. Prefer secure opaque server-managed sessions because there are only two participants and sessions must be easy to revoke.
+
+Access-code verification flow:
+
+1. Browser submits selected identity and private access code over HTTPS.
+2. Server validates the request.
+3. Server applies strict rate limiting.
+4. Server selects the correct access-code hash from environment variables.
+5. Server verifies the access code using Argon2id.
+6. Server generates a cryptographically strong random session token.
+7. Server stores only a SHA-256 or similarly secure hash of the token in PostgreSQL.
+8. Server sends the raw token in a secure HTTP-only cookie.
+9. Server returns only safe participant information.
+10. Browser redirects to /chat.
+
+Session validation flow:
+
+1. Read the HTTP-only cookie.
+2. Hash the received token.
+3. Look up an active, non-expired, non-revoked session.
+4. Load the corresponding participant.
+5. Optionally update last_used_at without causing excessive database writes.
+6. Attach the participant to the Express request or Socket.IO socket.
+
+Session expiration:
+
+Use a reasonable configurable duration, such as 30 days.
+
+Set it through an environment variable.
+
+Support logout from the current device.
+
+Optionally provide a secure way to revoke all sessions for both users through a maintenance script, not through a public admin page.
+
+==================================================
+14. SOCKET.IO AUTHENTICATION
+==================================================
+
+The Socket.IO connection must be authenticated.
+
+Because the application uses a same-origin HTTP-only session cookie, authenticate the socket handshake using that cookie.
+
+Do not ask frontend JavaScript to read the HTTP-only cookie.
+
+During the Socket.IO handshake:
+
+1. Parse the session cookie.
+2. Hash the session token.
+3. Find an active session in PostgreSQL.
+4. Load the participant.
+5. Attach the participant to socket.data.
+6. Reject unauthenticated sockets.
+
+Join each authenticated socket to a participant-specific room:
+
+participant:<participantId>
+
+Suggested Socket.IO client-to-server events:
+
+- message:send
+- message:delivered
+- messages:read
+- chat:sync
+
+Suggested server-to-client events:
+
+- message:new
+- message:confirmed
+- message:delivered
+- messages:read
+- presence:changed
+- session:invalid
+- chat:error
+
+Use acknowledgements for message sending.
+
+Validate every Socket.IO payload on the server using Zod or equivalent validation.
+
+Never trust browser data merely because it arrived over an authenticated socket.
+
+==================================================
+15. REST API REQUIREMENTS
+==================================================
+
+Use consistent JSON response formats.
+
+Suggested endpoints:
+
+Authentication and session:
+
+POST /api/access/verify
+GET  /api/session
+POST /api/session/logout
+
+Messages:
+
+GET /api/messages
+GET /api/messages/sync
+POST /api/messages/read
+
+Health:
+
+GET /health
+
+The health endpoint should not expose secrets, database URLs, environment variables, stack traces, or internal system information.
+
+It may return safe values such as:
+
+- status
+- current server time
+- application version if appropriate
+
+Use proper HTTP status codes.
+
+Return safe, user-friendly error messages.
+
+Do not send database errors or stack traces to the browser in production.
+
+==================================================
+16. SECURITY REQUIREMENTS
+==================================================
+
+Apply the following protections:
+
+- Helmet security headers
+- Content Security Policy configured for the local Socket.IO client and application assets
+- HTTP-only authentication cookie
+- Secure cookie in production
+- SameSite cookie protection
+- Argon2id access-code verification
+- Cryptographically secure random session tokens
+- Session-token hashing in PostgreSQL
+- Route-specific rate limiting
+- Access verification rate limiting by IP and selected identity
+- Message rate limiting per authenticated participant
+- JSON body-size limit
+- URL-encoded body-size limit where relevant
+- Zod request validation
+- Parameterized PostgreSQL queries
+- No SQL string concatenation
+- Plain-text message rendering
+- No unsafe innerHTML
+- No leaked secrets
+- No secrets in frontend files
+- No secrets committed to Git
+- Generic production error responses
+- Structured server logging without access codes, session tokens, or message contents
+- Graceful shutdown
+- Database pool cleanup
+- Correct proxy trust configuration for hosted environments
+- HTTPS assumptions in production
+- Correct cookie handling behind a reverse proxy
+- CORS disabled or restricted because frontend and backend use the same origin
+- Protection from duplicate messages
+- Protection from identity spoofing
+- Protection from reply-reference manipulation
+
+Add a .gitignore that excludes:
+
+- .env
+- node_modules
+- logs
+- editor files
+- operating-system files
+- temporary files
+- coverage data
+
+Provide a .env.example containing variable names only, with safe example placeholders.
+
+Never include real passwords, real access codes, private keys, or real database credentials.
+
+==================================================
+17. RATE-LIMITING REQUIREMENTS
+==================================================
+
+Provide practical defaults and place them in configuration where appropriate.
+
+Suggested starting values:
+
+Access-code verification:
+
+- Maximum 5 failed attempts per 15 minutes per IP
+- Additional limit by selected identity
+- Return a generic error response
+- Do not reveal whether an identity exists beyond the two visible choices
+
+Messages:
+
+- Maximum approximately 30 messages per minute per participant
+- Reasonable short burst support
+- Maximum 2,000 characters per message
+
+Session endpoint:
+
+- A moderate anti-abuse limit without interfering with normal page refreshes
+
+Health endpoint:
+
+- A sensible general limit if needed
+
+Document how to adjust these values.
+
+==================================================
+18. DATABASE CONNECTION MANAGEMENT
+==================================================
+
+Use pg.Pool.
+
+Make the connection pool configurable through environment variables.
+
+Use conservative defaults suitable for a free Supabase PostgreSQL plan.
+
+A reasonable starting maximum pool size is approximately 5 connections.
+
+Handle:
+
+- Connection errors
+- Query timeouts where appropriate
+- Transactions
+- Graceful shutdown
+- SSL configuration through environment variables
+- Supabase pooled connection strings
+- Local PostgreSQL development
+
+Do not create a new database connection for every request.
+
+Use explicit PostgreSQL transactions where multiple dependent database writes occur.
+
+==================================================
+19. REAL-TIME RELIABILITY
+==================================================
+
+The application must handle:
+
+- Temporary internet loss
+- Socket disconnection
+- Socket reconnection
+- Server restart
+- Hosting-provider sleep or cold start
+- Duplicate client retries
+- Multiple tabs
+- Multiple devices
+- Messages arriving while the chat is closed
+- Messages arriving while disconnected
+- Session expiration during an active socket connection
+
+The UI should clearly display states such as:
+
+- Connecting
+- Connected
+- Reconnecting
+- Offline
+- Waking server
+- Message failed
+
+After reconnecting:
+
+1. Revalidate the session.
+2. Reauthenticate the socket.
+3. Synchronize messages from PostgreSQL.
+4. Update read status.
+5. Update presence.
+6. Reconcile optimistic or pending messages.
+7. Avoid duplicate rendering.
+
+Do not attempt to defeat free-hosting sleep policies with prohibited or artificial keep-alive traffic.
+
+==================================================
+20. USER INTERFACE AND DESIGN
+==================================================
+
+Create a polished, original interface inspired by the usability of WhatsApp Web, but do not copy protected branding, logos, icons, source code, or exact visual assets.
+
+Use a clean private-chat visual system.
+
+Suggested design characteristics:
+
+- Dark or neutral header
+- Soft chat background
+- Distinct outgoing and incoming bubbles
+- Rounded message bubbles
+- Readable timestamps
+- Clear connection status
+- Subtle animations
+- Accessible contrast
+- Visible keyboard focus styles
+- Mobile-first responsive behavior
+- Smooth message appearance
+- Smooth scroll behavior where appropriate
+- Reduced-motion support
+- No heavy visual effects that create lag
+
+Use CSS variables for:
+
+- Colors
+- Spacing
+- Border radius
+- Shadows
+- Typography
+- Layout sizing
+
+Support modern mobile browsers.
+
+Handle the mobile on-screen keyboard as reliably as practical.
+
+The message composer should remain usable on smaller screens.
+
+Use semantic HTML and ARIA attributes where needed.
+
+==================================================
+21. PERFORMANCE REQUIREMENTS
+==================================================
+
+This application serves only two people, but it should still be efficient and smooth.
+
+Requirements:
+
+- Do not poll continuously when Socket.IO is connected.
+- Use Socket.IO for live updates.
+- Use REST for initial history and recovery synchronization.
+- Use cursor pagination.
+- Do not load all messages into the DOM forever.
+- Consider removing or virtualizing very old rendered messages if needed.
+- Debounce read updates.
+- Avoid excessive participant-state writes.
+- Avoid querying the database for every visual update.
+- Avoid unnecessary frontend libraries.
+- Keep frontend assets small.
+- Use database indexes.
+- Use transaction-safe message insertion.
+- Use server acknowledgements.
+- Minimize layout shifts.
+- Maintain scroll position when older messages are prepended.
+- Scroll to the newest message only when appropriate.
+- Do not force-scroll a user who is reading older messages.
+
+The goal is near-instant real-time text messaging when the server is active.
+
+Do not claim guaranteed WhatsApp-level latency because actual performance depends on internet connections, hosting region, database region, and hosting plan.
+
+==================================================
+22. PROJECT STRUCTURE
+==================================================
+
+Use a clean structure similar to the following, but improve it if needed while preserving separation of concerns:
+
+private-two-person-chat/
+├── public/
+│   ├── index.html
+│   ├── chat.html
+│   ├── css/
+│   │   ├── base.css
+│   │   ├── access.css
+│   │   └── chat.css
+│   ├── js/
+│   │   ├── api.js
+│   │   ├── access.js
+│   │   ├── chat.js
+│   │   ├── socket.js
+│   │   ├── state.js
+│   │   └── ui.js
+│   └── assets/
+│       └── optional local assets
+│
+├── src/
+│   ├── config/
+│   │   ├── env.js
+│   │   ├── database.js
+│   │   └── constants.js
+│   ├── controllers/
+│   │   ├── access.controller.js
+│   │   ├── session.controller.js
+│   │   └── message.controller.js
+│   ├── middleware/
+│   │   ├── authenticate.js
+│   │   ├── error-handler.js
+│   │   ├── not-found.js
+│   │   ├── rate-limiters.js
+│   │   └── validate.js
+│   ├── repositories/
+│   │   ├── participant.repository.js
+│   │   ├── session.repository.js
+│   │   └── message.repository.js
+│   ├── routes/
+│   │   ├── access.routes.js
+│   │   ├── session.routes.js
+│   │   ├── message.routes.js
+│   │   └── health.routes.js
+│   ├── services/
+│   │   ├── access.service.js
+│   │   ├── session.service.js
+│   │   └── message.service.js
+│   ├── sockets/
+│   │   ├── socket-auth.js
+│   │   ├── presence.store.js
+│   │   └── chat.handlers.js
+│   ├── utils/
+│   │   ├── async-handler.js
+│   │   ├── crypto.js
+│   │   ├── cookies.js
+│   │   └── logger.js
+│   ├── validators/
+│   │   ├── access.validators.js
+│   │   ├── message.validators.js
+│   │   └── session.validators.js
+│   └── app.js
+│
+├── database/
+│   ├── migrations/
+│   │   └── SQL migration files
+│   ├── seeds/
+│   │   └── participant seed file
+│   └── scripts/
+│       └── development reset script
+│
+├── scripts/
+│   ├── generate-access-hash.js
+│   ├── migrate.js
+│   ├── seed.js
+│   └── revoke-sessions.js
+│
+├── tests/
+│   ├── integration/
+│   └── unit/
+│
+├── server.js
+├── package.json
+├── package-lock.json or instructions to generate it
+├── .env.example
+├── .gitignore
+├── README.md
+└── optional deployment configuration files
+
+Do not create empty files merely to match this structure.
+
+Every included file must have a clear purpose and complete working content.
+
+==================================================
+23. TESTING REQUIREMENTS
+==================================================
+
+Include meaningful automated tests using an appropriate JavaScript testing framework.
+
+At minimum, test:
+
+- Correct access code creates a session
+- Incorrect access code is rejected
+- Missing access code is rejected
+- Expired session is rejected
+- Revoked session is rejected
+- Unauthenticated message retrieval is rejected
+- Unauthenticated socket is rejected
+- Authenticated socket is accepted
+- Empty messages are rejected
+- Oversized messages are rejected
+- Duplicate clientMessageId does not create two messages
+- Reply to a nonexistent message is rejected
+- Message sender is derived from the session
+- Read marker cannot move backward
+- One participant can receive the other participant's message
+- Logout revokes the session
+- Message pagination works correctly
+- Message synchronization after reconnection works correctly
+
+Explain how to run tests locally.
+
+Do not make the main project dependent on tests that require paid external services.
+
+Use a separate test database or clear test strategy.
+
+==================================================
+24. REQUIRED ENVIRONMENT VARIABLES
+==================================================
+
+Create and document an .env.example containing at least:
+
+NODE_ENV
+PORT
+APP_NAME
+APP_URL
+
+DATABASE_URL
+DATABASE_SSL
+DATABASE_POOL_MAX
+DATABASE_QUERY_TIMEOUT_MS
+
+SESSION_COOKIE_NAME
+SESSION_DURATION_DAYS
+SESSION_TOKEN_SECRET or SESSION_HASH_PEPPER if used and justified
+
+TUSHAR_ACCESS_CODE_HASH
+FRIEND_ACCESS_CODE_HASH
+
+ACCESS_RATE_LIMIT_WINDOW_MS
+ACCESS_RATE_LIMIT_MAX
+MESSAGE_RATE_LIMIT_WINDOW_MS
+MESSAGE_RATE_LIMIT_MAX
+
+LOG_LEVEL
+
+If other variables are required, add and document them.
+
+Validate required environment variables during server startup.
+
+Fail fast with a clear server-side message if a required variable is missing.
+
+Never return environment validation details to website visitors.
+
+==================================================
+25. ACCESS-CODE HASH GENERATION
+==================================================
+
+Provide a safe command-line script that generates an Argon2id hash for a private access code.
+
+The script should:
+
+- Prompt securely for the access code if practical
+- Avoid printing the raw access code
+- Print only the generated hash
+- Explain how to place the hash in the hosting provider's environment variables
+
+Do not put sample real access codes in the repository.
+
+Provide separate instructions to generate hashes for Tushar and Friend.
+
+==================================================
+26. LOCAL DEVELOPMENT
+==================================================
+
+Provide exact local setup instructions.
+
+Include:
+
+1. Required Node.js version
+2. Required PostgreSQL version or Supabase option
+3. Repository setup
+4. Dependency installation
+5. Environment-file creation
+6. Access-code hash generation
+7. Database migration
+8. Participant seeding
+9. Development server start
+10. Test execution
+11. Production start
+12. How to simulate both participants using separate browsers or private windows
+
+Use commands that work on standard Windows PowerShell where practical, and mention Linux or macOS equivalents when needed.
+
+The project should work locally at:
+
+http://localhost:3000
+
+Production cookies must be secure.
+
+Local-development cookies must work over HTTP without weakening production settings.
+
+==================================================
+27. DEPLOYMENT DOCUMENTATION
+==================================================
+
+Provide deployment instructions for at least:
+
+A. A generic Node.js WebSocket-capable host
+
+B. Render Web Service
+
+C. Northflank
+
+D. An Ubuntu VM using:
+
+- Node.js
+- PM2
+- Nginx
+- HTTPS with Let's Encrypt
+
+The application code must not depend on one provider.
+
+For hosted platforms, document:
+
+- Build command
+- Start command
+- Health-check path
+- Environment variables
+- PORT handling
+- WebSocket support
+- Reverse-proxy trust
+- Database connection string
+- Secure cookie behavior
+
+For Ubuntu VM deployment, include:
+
+- Basic firewall considerations
+- Reverse proxy configuration
+- WebSocket upgrade headers
+- Process management
+- HTTPS setup
+- Safe restart
+- Log viewing
+
+Do not include real credentials.
+
+==================================================
+28. DOCUMENTATION REQUIREMENTS
+==================================================
+
+Create a complete README.md including:
+
+- Project purpose
+- Feature list
+- Architecture
+- Technology stack
+- Folder structure
+- Security model
+- Database design
+- Session flow
+- Message flow
+- Socket.IO event list
+- Environment variables
+- Local setup
+- Migration commands
+- Seed commands
+- Access-code hash generation
+- Test commands
+- Deployment instructions
+- Troubleshooting
+- Backup considerations
+- Known free-hosting limitations
+- Future improvements
+
+Include a Mermaid sequence diagram if useful, but do not make understanding dependent on diagram rendering.
+
+Document all major API routes and Socket.IO events.
+
+==================================================
+29. CODE QUALITY RULES
+==================================================
+
+Follow these rules:
+
+- Use consistent modern JavaScript syntax.
+- Choose either ES modules or CommonJS and use it consistently.
+- Prefer ES modules unless a dependency requires otherwise.
+- Use async and await consistently.
+- Use descriptive names.
+- Keep controllers thin.
+- Keep business logic in services.
+- Keep SQL access in repositories.
+- Use parameterized SQL.
+- Avoid global mutable state except the intentionally limited presence store.
+- Centralize configuration.
+- Centralize cookie options.
+- Centralize errors.
+- Add comments only where they explain non-obvious decisions.
+- Do not over-comment basic syntax.
+- Do not leave TODO placeholders for required functionality.
+- Do not leave unimplemented functions.
+- Do not invent imports for files that are never created.
+- Do not create circular dependencies.
+- Keep frontend and backend naming consistent.
+- Ensure every npm dependency used in code exists in package.json.
+- Do not include unused dependencies.
+- Ensure every script referenced in package.json exists.
+- Ensure every route imported by the application exists.
+- Ensure SQL column names match JavaScript property mapping.
+- Ensure frontend selectors match the supplied HTML.
+- Ensure Socket.IO event names match on client and server.
+- Ensure cookie names match everywhere.
+- Ensure environment variable names match everywhere.
+
+==================================================
+30. OUTPUT AND DELIVERY PROTOCOL
+==================================================
+
+Before generating code, provide:
+
+1. A concise architecture summary
+2. The final project tree
+3. The database entity summary
+4. The REST route list
+5. The Socket.IO event list
+6. The environment-variable list
+7. The implementation stages
+
+Then generate the project.
+
+For every file, use this exact format:
+
+FILE: relative/path/to/file.ext
+
+```language
+Complete file content
+
+
+After each stage, provide:
+
+Files completed
+Commands to run
+Expected result
+Tests for that stage
+Any remaining stages
+
+Do not repeat unchanged files in later stages.
+
+If a previously generated file must be corrected, provide the entire corrected file and clearly state:
+
+REPLACE FILE: relative/path/to/file.ext
+
+Do not provide only a small patch unless I explicitly request a patch.
+
+If the response reaches its output limit:
+
+Stop only after completing the current file.
+Do not cut a file in the middle.
+State the exact next file to generate.
+Maintain a progress checklist.
+Continue from that exact point when I say "continue."
+
+Do not ask for confirmation between every file.
+
+Only ask a question if a missing detail makes secure implementation impossible.
+
+Otherwise, make a reasonable secure decision and document it.
+
+================================================== 31. SUGGESTED IMPLEMENTATION STAGES
+
+Use these stages unless a better dependency order is clearly justified.
+
+Stage 1: Architecture, project structure, package.json, environment validation, Express server, error handling, static frontend serving, health endpoint, and database pool.
+
+Stage 2: PostgreSQL migrations, participant seed, migration runner, seed runner, access-code hash generator, and database documentation.
+
+Stage 3: Access-code verification, secure session creation, session middleware, session API, logout, cookie handling, and rate limiting.
+
+Stage 4: Identity verification frontend, responsive styling, session restoration, automatic redirect, and frontend error handling.
+
+Stage 5: Message repository, service, REST history endpoint, cursor pagination, read markers, synchronization endpoint, and validation.
+
+Stage 6: Socket.IO authentication, messaging events, acknowledgement handling, presence tracking, delivery tracking, read events, and reconnection synchronization.
+
+Stage 7: Complete chat frontend, message bubbles, timestamps, reply UI, delivery indicators, read indicators, history pagination, scroll handling, connection states, and responsive mobile layout.
+
+Stage 8: Automated tests, security review, consistency review, README, deployment instructions, and troubleshooting.
+
+================================================== 
+32. ACCEPTANCE CRITERIA
+================================================== 
+
+The project is complete only when all of the following work:
+
+The server starts successfully with valid environment variables.
+The server fails safely when required environment variables are missing.
+The database migrations run successfully.
+Exactly two participants are seeded.
+Tushar can verify using only Tushar's access code.
+Friend can verify using only Friend's access code.
+An incorrect access code is rejected.
+A valid session opens the chat automatically on future visits.
+Logout revokes the current session.
+An unauthenticated user cannot access message data.
+An unauthenticated Socket.IO connection is rejected.
+Tushar and Friend can open the app in separate browsers.
+Either person can send a text message.
+The message is saved before real-time delivery.
+The recipient sees the message without refreshing.
+Messages remain after restarting the Node.js server.
+A disconnected recipient receives missed messages after reconnecting.
+Retried messages do not create duplicates.
+Message timestamps come from the server or database.
+Replying to a message works.
+Invalid reply references are rejected.
+Sent, delivered, and read states update correctly.
+Multiple tabs do not incorrectly mark a participant offline.
+Older messages load through cursor pagination.
+The read marker does not move backward.
+Message content cannot execute HTML or JavaScript.
+The layout works on desktop and mobile.
+Frontend and backend use one origin and one public URL.
+The application works locally without changing frontend URLs.
+The project contains complete documentation and no required TODO placeholders.
+
+================================================== 
+33. FINAL CONSISTENCY AND SECURITY REVIEW
+================================================== 
+
+Before declaring the project complete, perform a full consistency check.
+
+Verify:
+
+Every referenced file exists.
+Every import path is correct.
+Every dependency is included.
+Every script exists.
+Every SQL table and column name matches the application code.
+Every environment variable is documented.
+Every route mounted in app.js exists.
+Every frontend API URL matches the backend.
+Every Socket.IO event name matches.
+Every DOM element queried in JavaScript exists in HTML.
+Access codes are never exposed.
+Session tokens are never logged.
+Session tokens are hashed before database storage.
+Database queries are parameterized.
+Authentication is required for all message operations.
+Socket authentication uses the HTTP-only cookie.
+Messages are stored before broadcasting.
+Duplicate-message prevention works.
+Reply validation works.
+Rate limits are active.
+Production errors do not expose stack traces.
+The project can be installed and started from the README instructions.
+
+Also provide a final checklist explaining how I can manually test the complete application using:
+
+One normal browser window as Tushar
+One private or incognito browser window as Friend
+
+================================================== 
+34. IMPORTANT WORKING INSTRUCTION
+================================================== 
+
+Do not simplify or remove requirements without explicitly stating the reason.
+
+Do not switch to Firebase, MongoDB, Supabase Auth, Supabase Realtime, React, Next.js, or a third-party chat service unless I explicitly request that change.
+
+Use:
+
+HTML
+CSS
+Vanilla JavaScript
+Node.js
+Express
+Socket.IO
+PostgreSQL
+Secure opaque session cookies
+
+Start by presenting the architecture, final project tree, database entities, APIs, Socket.IO events, environment variables, and staged implementation plan.
+
+Then begin Stage 1 immediately without asking me to reconfirm the project.
+
+
+---
+
+# Optional Information to Add Before Reusing It
+
+Before giving this prompt to another AI, you can add this small customization block at the top:
+
+```text
+PROJECT CUSTOMIZATION
+
+Application name: [Choose a name]
+Friend's display name: [Friend's name]
+Preferred color theme: [Dark / Light / Both]
+Preferred database: Supabase PostgreSQL
+Preferred deployment provider: [Undecided / Render / Northflank / Oracle Cloud]
+Session duration: 30 days
+Initial message page size: 30
+Message maximum length: 2,000 characters
